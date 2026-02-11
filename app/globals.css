@@ -1,0 +1,153 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    color-scheme: light;
+    --color-primary: #1F6F6A;
+    --color-secondary: #2C4F73;
+    --color-text: #2B2B2B;
+    --color-bg: #FFFFFF;
+    --color-bg-light: #F5F5F5;
+    --color-border: #E6E6E6;
+    --color-on-primary: #FFFFFF;
+
+    --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.08);
+    --shadow-card-hover: 0 8px 16px rgba(0, 0, 0, 0.12);
+
+    --radius-card: 8px;
+    --radius-btn: 6px;
+
+    --container-max: 1200px;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      color-scheme: dark;
+      --color-primary: #2A7F79;
+      --color-secondary: #4E7AA3;
+      --color-text: #F2F2F2;
+      --color-bg: #121212;
+      --color-bg-light: #1A1A1A;
+      --color-border: #2A2A2A;
+      --color-on-primary: #F2F2F2;
+
+      --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.18);
+      --shadow-card-hover: 0 6px 12px rgba(0, 0, 0, 0.24);
+    }
+  }
+
+  html {
+    font-family: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+
+  body {
+    @apply bg-[var(--color-bg)] text-[var(--color-text)] text-[16px] leading-[1.5] md:text-[18px];
+  }
+
+  h1 {
+    @apply text-[32px] leading-[1.2] md:text-[42px] lg:text-[56px] font-semibold;
+  }
+
+  h2 {
+    @apply text-[24px] leading-[1.3] md:text-[32px] lg:text-[40px] font-semibold;
+  }
+
+  h3 {
+    @apply text-[24px] leading-[1.3] font-semibold;
+  }
+
+  a {
+    @apply text-[var(--color-secondary)] transition-colors duration-200;
+  }
+
+  a:hover {
+    @apply underline;
+  }
+
+  input,
+  textarea,
+  select {
+    @apply outline-none;
+  }
+}
+
+@layer components {
+  .rich-text {
+    @apply space-y-5 text-[16px] leading-[1.6] md:text-[18px];
+  }
+
+  .rich-text h2 {
+    @apply text-[22px] leading-[1.3] md:text-[28px] font-semibold;
+  }
+
+  .rich-text h3 {
+    @apply text-[20px] leading-[1.3] font-semibold;
+  }
+
+  .rich-text ul {
+    @apply list-disc pl-5 space-y-2;
+  }
+
+  .rich-text ol {
+    @apply list-decimal pl-5 space-y-2;
+  }
+
+  .rich-text a {
+    @apply underline;
+  }
+
+  /* Стили для таблиц Markdown (GFM) */
+  .rich-text table {
+    @apply w-full border-collapse my-6 overflow-x-auto block md:table;
+  }
+
+  .rich-text thead {
+    @apply bg-[var(--color-bg-light)];
+  }
+
+  .rich-text tbody {
+    @apply divide-y divide-[var(--color-border)];
+  }
+
+  .rich-text tr {
+    @apply border-b border-[var(--color-border)];
+  }
+
+  .rich-text tr:nth-child(even) {
+    background-color: color-mix(in srgb, var(--color-bg-light) 50%, transparent);
+  }
+
+  .rich-text th {
+    @apply px-4 py-3 text-left font-semibold border-b-2 border-[var(--color-border)];
+    color: var(--color-text);
+  }
+
+  .rich-text td {
+    @apply px-4 py-3;
+    color: color-mix(in srgb, var(--color-text) 90%, transparent);
+  }
+
+  .rich-text th:first-child,
+  .rich-text td:first-child {
+    @apply pl-0;
+  }
+
+  .rich-text th:last-child,
+  .rich-text td:last-child {
+    @apply pr-0;
+  }
+
+  /* Адаптивность для мобильных */
+  @media (max-width: 768px) {
+    .rich-text table {
+      @apply text-sm;
+    }
+
+    .rich-text th,
+    .rich-text td {
+      @apply px-2 py-2;
+    }
+  }
+}

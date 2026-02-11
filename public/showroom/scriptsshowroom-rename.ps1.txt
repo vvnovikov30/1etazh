@@ -1,0 +1,130 @@
+param(
+  [string]$Dir = ".\public\showroom",
+  [switch]$Apply
+)
+
+# --- translit ru -> en (минимально необходимое) ---
+function Transliterate([string]$s) {
+  $map = @{
+    'а'='a';'б'='b';'в'='v';'г'='g';'д'='d';'е'='e';'ё'='e';'ж'='zh';'з'='z';'и'='i';'й'='y';
+    'к'='k';'л'='l';'м'='m';'н'='n';'о'='o';'п'='p';'р'='r';'с'='s';'т'='t';'у'='u';'ф'='f';
+    'х'='h';'ц'='ts';'ч'='ch';'ш'='sh';'щ'='sch';'ъ'='';'ы'='y';'ь'='';'э'='e';'ю'='yu';'я'='ya'
+  }
+  $out = ""
+  foreach ($ch in $s.ToCharArray()) {
+    $c = $ch.ToString()
+    $lc = $c.ToLower()
+    if ($map.ContainsKey($lc)) {
+      $t = $map[$lc]
+      $out += $t
+    } else {
+      $out += $lc
+    }
+  }
+  return $out
+}
+
+function Slugify([string]$s) {
+  $s = $s.Trim()
+  $s = Transliterate($s)
+  $s = $s -replace '[^a-z0-9]+','-'
+  $s = $s -replace '^-+',''
+  $s = $s -replace '-+$',''
+  if ([string]::IsNullOrWhiteSpace($s)) { $s = "image" }
+  return $s
+}
+
+# Rule-based classifier: zone/subject
+function Classify([string]$name) {
+  $n = $name.ToLower()
+  $zone = "misc"
+  $subject = "view"
+
+  if ($n -match 'план|plan') { $zone = "plan"; $subject = "floor-plan" }
+  elseif ($n -match 'фасад|exterior|улиц|снаруж') { $zone = "exterior"; $subject = "facade" }
+  elseif ($n -match 'пруд|сад|участок|land|yard') { $zone = "landscape"; $subject = "garden" }
+  elseif ($n -match 'котел|котельн|инжен|щит|boiler') { $zone = "engineering"; $subject = "boiler-room" }
+  elseif ($n -match 'ванн|bath') { $zone = "bathroom"; $subject = "bathroom" }
+  elseif ($n -match 'душ|shower') { $zone = "bathroom"; $subject = "shower" }
+  elseif ($n -match 'туалет|wc|toilet') { $zone = "bathroom"; $subject = "toilet" }
+  elseif ($n -match 'спальн|bed') { $zone = "bedroom"; $subject = "bedroom" }
+  elseif ($n -match 'кухн|зал|гостин|kitchen|living') { $zone = "interior"; $subject = "kitchen-living" }
+  elseif ($n -match 'общ|interior|room') { $zone = "interior"; $subject = "interior" }
+
+  return @{ zone=$zone; subject=$subject }
+}
+
+$files = Get-ChildItem -Path $Dir -File | Where-Object { $_.Extension -match '\.(jpg|jpeg|png)$' } | Sort-Object Name
+
+if ($files.Count -eq 0) {
+  Write-Host "No images found in $Dir"
+  exit 0
+}
+
+$plan = @()
+$used = @{}
+
+# numbering per (zone+subject)
+$counter = @{}
+
+foreach ($f in $files) {
+  $base = [System.IO.Path]::GetFileNameWithoutExtension($f.Name)
+  $ext = $f.Extension.ToLower()
+
+  $cls = Classify $base
+  $zone = $cls.zone
+  $subject = $cls.subject
+
+  $key = "$zone|$subject"
+  if (-not $counter.ContainsKey($key)) { $counter[$key] = 0 }
+  $counter[$key]++
+
+  $nn = "{0:D2}" -f $counter[$key]
+
+  $newBase = "odnoetazhniki-showroom-$zone-$subject-$nn"
+  $newName = "$newBase$ext"
+
+  # collision protection
+  $candidate = $newName
+  $i = 2
+  while (Test-Path (Join-Path $Dir $candidate)) {
+    $candidate = "$newBase-$i$ext"
+    $i++
+  }
+  $newName = $candidate
+
+  $plan += [pscustomobject]@{
+    OldName = $f.Name
+    NewName = $newName
+    Zone = $zone
+    Subject = $subject
+    Src = "/showroom/$newName"
+    Alt = "Шоурум одноэтажного дома: $subject"
+    Caption = "$subject"
+  }
+}
+
+# Export plan
+$csvPath = Join-Path $Dir "rename-plan.csv"
+$plan | Export-Csv -Path $csvPath -NoTypeInformation -Encoding UTF8
+Write-Host "Plan saved: $csvPath"
+
+# Preview
+$plan | Select-Object OldName, NewName, Zone, Subject | Format-Table -AutoSize
+
+if (-not $Apply) {
+  Write-Host "`nRun with -Apply to actually rename files:"
+  Write-Host "powershell -ExecutionPolicy Bypass -File scripts\showroom-rename.ps1 -Dir `"$Dir`" -Apply"
+  exit 0
+}
+
+# Apply renames
+foreach ($row in $plan) {
+  $oldPath = Join-Path $Dir $row.OldName
+  $newPath = Join-Path $Dir $row.NewName
+  if (Test-Path $oldPath) {
+    Rename-Item -Path $oldPath -NewName $row.NewName
+  }
+}
+
+Write-Host "Renaming complete."

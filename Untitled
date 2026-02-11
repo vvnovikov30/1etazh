@@ -1,0 +1,3 @@
+$base = ".\public\showroom"
+$dirs = @("exterior","interior","kitchen","bathroom","bedroom","engineering","plan","landscape","misc")
+$dirs | ForEach-Object { New-Item -ItemType Directory -Force -Path (Join-Path $base $_) | Out-Null }
