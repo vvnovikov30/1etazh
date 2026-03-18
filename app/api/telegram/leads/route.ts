@@ -24,47 +24,6 @@ const TYPE_ALLOWLIST = ["showroom_visit"] as const;
 const PREFERRED_DAY_ALLOWLIST = ["today", "weekend", "weekday", "custom"] as const;
 const PREFERRED_TIME_ALLOWLIST = ["morning", "day", "evening"] as const;
 
-// In-memory rate limit storage
-const rateLimitMap = new Map<string, { ts: number[] }>();
-
-const RATE_LIMIT_WINDOW_MS = 10 * 60 * 1000; // 10 minutes
-const RATE_LIMIT_MAX_REQUESTS = 10;
-
-function getClientIp(request: Request): string {
-  const forwardedFor = request.headers.get("x-forwarded-for");
-  if (forwardedFor) {
-    const ips = forwardedFor.split(",").map((ip) => ip.trim());
-    return ips[0] || "unknown";
-  }
-  const realIp = request.headers.get("x-real-ip");
-  if (realIp) {
-    return realIp;
-  }
-  return "unknown";
-}
-
-function checkRateLimit(ip: string): boolean {
-  const now = Date.now();
-  const entry = rateLimitMap.get(ip);
-
-  if (!entry) {
-    rateLimitMap.set(ip, { ts: [now] });
-    return true;
-  }
-
-  // Удаляем старые запросы (старше окна)
-  entry.ts = entry.ts.filter((timestamp) => now - timestamp < RATE_LIMIT_WINDOW_MS);
-
-  // Проверяем лимит
-  if (entry.ts.length >= RATE_LIMIT_MAX_REQUESTS) {
-    return false;
-  }
-
-  // Добавляем текущий запрос
-  entry.ts.push(now);
-  return true;
-}
-
 type SafeReadJsonError = "UNSUPPORTED_CONTENT_TYPE" | "PAYLOAD_TOO_LARGE" | "INVALID_JSON";
 
 async function safeReadJson<T>(request: Request): Promise<{ data: T } | { error: SafeReadJsonError }> {
@@ -113,15 +72,7 @@ function validatePreferredTime(value: unknown): LeadsPayload["preferredTime"] | 
 }
 
 export async function POST(request: Request) {
-  // Rate limiting
-  const ip = getClientIp(request);
-  if (!checkRateLimit(ip)) {
-    return NextResponse.json(
-      { ok: false, error: "Слишком много запросов. Попробуйте позже." },
-      { status: 429 }
-    );
-  }
-
+  // Rate limiting обрабатывается в middleware.ts
   // Safe JSON parsing
   const jsonResult = await safeReadJson<LeadsPayload>(request);
   if ("error" in jsonResult) {
@@ -268,10 +219,13 @@ export async function POST(request: Request) {
   const text = lines.join("\n");
 
   // Диагностическое логирование перед отправкой в Telegram
+  // NEVER log secrets - только статус конфигурации без значений
   if (process.env.NODE_ENV !== "production") {
+    // Используем getEnvOptional для безопасной проверки (не логируем значения)
+    const { getEnvOptional } = await import("@/lib/env");
     console.info("[TELEGRAM_SEND_ATTEMPT]", {
-      chatId: process.env.TELEGRAM_LEADS_CHAT_ID ? "configured" : "missing",
-      hasThread: Boolean(process.env.TELEGRAM_LEADS_MESSAGE_THREAD_ID),
+      chatIdConfigured: Boolean(getEnvOptional("TELEGRAM_LEADS_CHAT_ID")),
+      hasThread: Boolean(getEnvOptional("TELEGRAM_LEADS_MESSAGE_THREAD_ID")),
     });
   }
 
@@ -279,6 +233,7 @@ export async function POST(request: Request) {
     const sent = await sendTelegramMessage("LEADS", text);
     
     if (!sent) {
+      // NEVER log secrets
       if (process.env.NODE_ENV !== "production") {
         console.error("[TELEGRAM_SEND_ERROR]", {
           message: "sendTelegramMessage returned false",
@@ -296,8 +251,9 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ ok: true });
   } catch (err) {
+    // NEVER log secrets - логируем только ошибку без контекста секретов
     if (process.env.NODE_ENV !== "production") {
-      console.error("[TELEGRAM_SEND_ERROR]", err);
+      console.error("[TELEGRAM_SEND_ERROR]", err instanceof Error ? err.message : "Unknown error");
     }
     return NextResponse.json(
       { ok: false, error: "Telegram send failed" },

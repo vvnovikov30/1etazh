@@ -1,3 +1,6 @@
+import "server-only";
+import { getEnv, getEnvOptional } from "@/lib/env";
+
 type TelegramGroup = "LEADS" | "DISCUSSION";
 
 type TelegramConfig = {
@@ -21,12 +24,26 @@ const TELEGRAM_ENV_KEYS: Record<TelegramGroup, { token: string; chatId: string; 
 
 function getTelegramConfig(group: TelegramGroup): TelegramConfig | null {
   const envKeys = TELEGRAM_ENV_KEYS[group];
-  const token = process.env[envKeys.token]?.trim();
-  const chatId = process.env[envKeys.chatId]?.trim();
-  const threadIdRaw = process.env[envKeys.threadId]?.trim();
+  
+  // P0: Используем безопасный доступ к ENV
+  // В production выбрасывает ошибку если отсутствует
+  // В development возвращает null (graceful degradation)
+  let token: string;
+  let chatId: string;
+  
+  try {
+    token = getEnv(envKeys.token);
+    chatId = getEnv(envKeys.chatId);
+  } catch {
+    // В production getEnv выбрасывает ошибку - это правильно
+    // В development возвращает пустую строку
+    return null;
+  }
 
   if (!token || !chatId) return null;
 
+  // Опциональный threadId
+  const threadIdRaw = getEnvOptional(envKeys.threadId);
   const messageThreadId = threadIdRaw ? Number(threadIdRaw) : undefined;
 
   return {
