@@ -3,6 +3,8 @@
 import { useEffect, useRef, useState, type ReactNode, useMemo, useCallback } from "react";
 import { shuffleWithSeed, getOrCreateSeed } from "@/lib/shuffle";
 
+const GAP_PX = 16; // соответствует gap-4
+
 type CarouselProps<T> = {
   items: T[];
   renderItem: (item: T, index: number) => ReactNode;
@@ -39,8 +41,13 @@ export function Carousel<T>({
   const [currentIndex, setCurrentIndex] = useState(1); // Стартовый индекс для infinite = 1
   const currentIndexRef = useRef(1); // Ref для отслеживания текущего индекса
   const [isInteracting, setIsInteracting] = useState(false);
-  const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
+  const [prefersReducedMotion, setPrefersReducedMotion] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  });
   const [isTransitioning, setIsTransitioning] = useState(false);
+  const [containerWidth, setContainerWidth] = useState(0);
+  const [itemWidth, setItemWidth] = useState(0);
   const autoScrollTimerRef = useRef<NodeJS.Timeout | null>(null);
   const touchStartXRef = useRef<number | null>(null);
   const touchStartYRef = useRef<number | null>(null);
@@ -51,7 +58,6 @@ export function Carousel<T>({
   const isPointerDownRef = useRef<boolean>(false);
   const dragOffsetRef = useRef<number>(0);
   const itemWidthRef = useRef<number>(0);
-  const gapRef = useRef<number>(16); // gap-4 = 16px
   const isInitializedRef = useRef<boolean>(false);
 
   // Рандомизация и создание extendedItems для infinite loop
@@ -90,7 +96,6 @@ export function Carousel<T>({
     if (typeof window === "undefined") return;
     
     const mediaQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
-    setPrefersReducedMotion(mediaQuery.matches);
 
     const handleChange = (e: MediaQueryListEvent) => {
       setPrefersReducedMotion(e.matches);
@@ -110,7 +115,10 @@ export function Carousel<T>({
 
       const firstItem = track.children[0] as HTMLElement;
       if (firstItem) {
-        itemWidthRef.current = firstItem.offsetWidth;
+        const nextItemWidth = firstItem.offsetWidth;
+        itemWidthRef.current = nextItemWidth;
+        setItemWidth(nextItemWidth);
+        setContainerWidth(containerRef.current?.offsetWidth ?? 0);
       }
     };
 
@@ -181,26 +189,14 @@ export function Carousel<T>({
     };
   }, [infinite, extendedItems.length, originalLength]);
 
-  // Вычисляем translateX для позиционирования
-  const getTranslateX = useCallback(() => {
-    if (itemWidthRef.current === 0) return 0;
-    const itemWidth = itemWidthRef.current;
-    const gap = gapRef.current;
-    const totalWidth = itemWidth + gap;
-    
-    if (infinite) {
-      // Для infinite: currentIndex уже в extendedItems координатах
-      const centerOffset = containerRef.current 
-        ? containerRef.current.offsetWidth / 2 
-        : 0;
-      return centerOffset - (currentIndex * totalWidth + itemWidth / 2) + dragOffsetRef.current;
-    } else {
-      const centerOffset = containerRef.current 
-        ? containerRef.current.offsetWidth / 2 
-        : 0;
-      return centerOffset - (currentIndex * totalWidth + itemWidth / 2) + dragOffsetRef.current;
-    }
-  }, [currentIndex, infinite]);
+  const translateX = useMemo(() => {
+    if (itemWidth === 0) return 0;
+    const totalWidth = itemWidth + GAP_PX;
+    const centerOffset = containerWidth / 2;
+    // dragOffsetRef используется для "живого" перетаскивания через прямую запись в style.transform,
+    // поэтому здесь не учитываем его, чтобы не читать ref во время render.
+    return centerOffset - (currentIndex * totalWidth + itemWidth / 2);
+  }, [containerWidth, currentIndex, itemWidth]);
 
   // Переход к следующему индексу
   const goToIndex = useCallback((targetIndex: number, smooth = true) => {
@@ -338,7 +334,7 @@ export function Carousel<T>({
       
       // Обновляем transform напрямую для визуальной обратной связи
       const itemWidth = itemWidthRef.current || 0;
-      const gap = gapRef.current;
+      const gap = GAP_PX;
       const totalWidth = itemWidth + gap;
       const centerOffset = containerRef.current 
         ? containerRef.current.offsetWidth / 2 
@@ -440,7 +436,7 @@ export function Carousel<T>({
       
       // Обновляем transform напрямую для визуальной обратной связи
       const itemWidth = itemWidthRef.current || 0;
-      const gap = gapRef.current;
+      const gap = GAP_PX;
       const totalWidth = itemWidth + gap;
       const centerOffset = containerRef.current 
         ? containerRef.current.offsetWidth / 2 
@@ -629,7 +625,6 @@ export function Carousel<T>({
   if (extendedItems.length === 0) return null;
 
   const displayItems = infinite ? extendedItems : processedItems;
-  const translateX = getTranslateX();
   const transitionDuration = isTransitioning && !prefersReducedMotion ? 500 : 0;
 
   return (
