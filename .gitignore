@@ -3,3 +3,13 @@ node_modules/
 
 # Local environment secrets
 .env.local
+
+# Python venv
+.venv/
+
+# TypeScript build info
+*.tsbuildinfo
+
+# Archives & audit reports
+*.zip
+audit*.json
