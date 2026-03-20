@@ -18,7 +18,26 @@
 
 const API_URL = process.env.API_URL || "http://localhost:3000";
 const ENDPOINT = `${API_URL}/api/telegram/leads`;
-const TOTAL_REQUESTS = 15;
+const SHORT_MODE = ["1", "true", "yes"].includes(
+  String(process.env.SHORT_MODE || "").toLowerCase()
+);
+const TOTAL_REQUESTS = SHORT_MODE ? 5 : 15;
+const REQUEST_DELAY_MS = SHORT_MODE ? 10 : 50;
+
+function buildPayload(index) {
+  const payload = {
+    name: `Test User ${index}`,
+    phone: "+79991234567",
+    type: "showroom_visit",
+  };
+
+  if (SHORT_MODE) {
+    // Short mode bypasses Telegram send path in route handler to keep smoke fast.
+    payload.hp = "short-mode-smoke";
+  }
+
+  return payload;
+}
 
 async function makeRequest(index, customHeaders = {}) {
   try {
@@ -29,11 +48,7 @@ async function makeRequest(index, customHeaders = {}) {
         "Content-Type": "application/json",
         ...customHeaders,
       },
-      body: JSON.stringify({
-        name: `Test User ${index}`,
-        phone: "+79991234567",
-        type: "showroom_visit",
-      }),
+      body: JSON.stringify(buildPayload(index)),
     });
 
     const endTime = Date.now();
@@ -68,7 +83,16 @@ async function makeRequest(index, customHeaders = {}) {
     return {
       index,
       status: "ERROR",
-      error: error.message,
+      error: error instanceof Error ? error.message : String(error),
+      rateLimitHeaders: {
+        limit: null,
+        remaining: null,
+        reset: null,
+        retryAfter: null,
+        debugId: null,
+      },
+      body: null,
+      duration: 0,
     };
   }
 }
@@ -99,7 +123,7 @@ function printResult(result, label = "") {
     );
   }
 
-  if (result.rateLimitHeaders.limit) {
+  if (result.rateLimitHeaders?.limit) {
     console.log(
       `      Rate Limit: ${result.rateLimitHeaders.remaining || "?"}/${result.rateLimitHeaders.limit} remaining`
     );
@@ -139,7 +163,7 @@ async function testBasicRateLimit() {
     results.push(result);
     printResult(result);
     if (i < TOTAL_REQUESTS) {
-      await new Promise((resolve) => setTimeout(resolve, 50));
+      await new Promise((resolve) => setTimeout(resolve, REQUEST_DELAY_MS));
     }
   }
 
@@ -165,7 +189,7 @@ async function testPrivateIp() {
     results.push(result);
     printResult(result, "PRIVATE-IP");
     if (i < 5) {
-      await new Promise((resolve) => setTimeout(resolve, 50));
+      await new Promise((resolve) => setTimeout(resolve, REQUEST_DELAY_MS));
     }
   }
 
@@ -226,7 +250,7 @@ async function testSpoofingAttempt() {
 
     // Определяем режим из первого ответа (даже если 429)
     if (i === 0) {
-      firstDebugId = result.rateLimitHeaders.debugId || null;
+      firstDebugId = result.rateLimitHeaders?.debugId || null;
       if (firstDebugId) {
         if (firstDebugId.startsWith("ip:")) {
           mode = "primary";
@@ -239,12 +263,12 @@ async function testSpoofingAttempt() {
     }
 
     // Показываем debug ID если доступен
-    const debugId = result.rateLimitHeaders.debugId;
+    const debugId = result.rateLimitHeaders?.debugId;
     const label = debugId ? `SPOOF-${i + 1} [${debugId}]` : `SPOOF-${i + 1}`;
     printResult(result, label);
 
     if (i < TOTAL_REQUESTS - 1) {
-      await new Promise((resolve) => setTimeout(resolve, 50));
+      await new Promise((resolve) => setTimeout(resolve, REQUEST_DELAY_MS));
     }
   }
 
@@ -337,7 +361,7 @@ async function testIpv6SpecialCases() {
     });
     results.push({ ...testCase, result });
 
-    const debugId = result.rateLimitHeaders.debugId || "none";
+    const debugId = result.rateLimitHeaders?.debugId || "none";
     const status = result.status >= 200 && result.status < 300 ? "✅" : result.status === 429 ? "❌" : "⚠️";
     
     console.log(`  ${status} ${testCase.name}: ${testCase.ip}`);
@@ -366,8 +390,8 @@ async function testIpv6SpecialCases() {
     await new Promise((resolve) => setTimeout(resolve, 50));
   }
 
-  const filteredCount = results.filter(r => r.expected === "filtered" && r.result.rateLimitHeaders.debugId?.startsWith("unknown:")).length;
-  const publicCount = results.filter(r => r.expected === "public" && (r.result.rateLimitHeaders.debugId?.startsWith("fallback:") || r.result.rateLimitHeaders.debugId?.startsWith("ip:"))).length;
+  const filteredCount = results.filter(r => r.expected === "filtered" && r.result.rateLimitHeaders?.debugId?.startsWith("unknown:")).length;
+  const publicCount = results.filter(r => r.expected === "public" && (r.result.rateLimitHeaders?.debugId?.startsWith("fallback:") || r.result.rateLimitHeaders?.debugId?.startsWith("ip:"))).length;
 
   console.log(`  Summary: ${filteredCount}/${results.filter(r => r.expected === "filtered").length} filtered correctly, ${publicCount}/${results.filter(r => r.expected === "public").length} public recognized`);
 
@@ -420,7 +444,7 @@ async function testUnknownIp() {
     results.push(result);
     printResult(result, "UNKNOWN-IP");
     if (i < 5) {
-      await new Promise((resolve) => setTimeout(resolve, 50));
+      await new Promise((resolve) => setTimeout(resolve, REQUEST_DELAY_MS));
     }
   }
 
@@ -437,6 +461,24 @@ async function runLoadTest() {
   console.log(`Unknown IP limit: 2 requests/minute`);
   console.log("=".repeat(60));
   console.log();
+  if (SHORT_MODE) {
+    console.log("⚡ SHORT_MODE enabled: reduced request volume and Telegram-bypass payload for fast smoke.");
+    console.log();
+  }
+
+  try {
+    const health = await fetch(`${API_URL}/`, { redirect: "manual" });
+    if (!health.ok && health.status !== 307 && health.status !== 308) {
+      console.error(`❌ API server responded with ${health.status} at ${API_URL}`);
+      console.error("   Start the app first (e.g. npm run dev) and re-run this script.");
+      return false;
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error(`❌ Cannot reach API server at ${API_URL}: ${message}`);
+    console.error("   Start the app first (e.g. npm run dev) and re-run this script.");
+    return false;
+  }
 
   const allResults = {
     total: 0,
@@ -519,10 +561,18 @@ async function runLoadTest() {
   }
 
   console.log("=".repeat(60));
+  return true;
 }
 
 // Запускаем тест
-runLoadTest().catch((error) => {
-  console.error("Fatal error:", error);
-  process.exit(1);
-});
+runLoadTest()
+  .then((ok) => {
+    if (!ok) {
+      process.exitCode = 1;
+    }
+  })
+  .catch((error) => {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error(`Fatal error: ${message}`);
+    process.exitCode = 1;
+  });

@@ -9,6 +9,7 @@ describe("lib/env.ts", () => {
   });
 
   afterEach(() => {
+    vi.unstubAllEnvs();
     vi.restoreAllMocks();
     process.env = { ...ORIGINAL_ENV };
   });
@@ -28,7 +29,7 @@ describe("lib/env.ts", () => {
   });
 
   it("getEnv handles empty string in development mode", () => {
-    process.env.NODE_ENV = "development";
+    vi.stubEnv("NODE_ENV", "development");
     process.env.TEST_EMPTY_ENV = "   ";
 
     const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
@@ -39,7 +40,7 @@ describe("lib/env.ts", () => {
   });
 
   it("getEnv throws in production mode for missing variable", () => {
-    process.env.NODE_ENV = "production";
+    vi.stubEnv("NODE_ENV", "production");
     delete process.env.TEST_REQUIRED_PROD;
 
     expect(() => getEnv("TEST_REQUIRED_PROD")).toThrow(
@@ -48,7 +49,7 @@ describe("lib/env.ts", () => {
   });
 
   it("getEnv does not leak secret values to logs in development", () => {
-    process.env.NODE_ENV = "development";
+    vi.stubEnv("NODE_ENV", "development");
     process.env.SECRET_TOKEN = "";
 
     const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});

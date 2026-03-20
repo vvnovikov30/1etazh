@@ -1,17 +1,47 @@
 import { spawn } from "node:child_process";
+import net from "node:net";
 import { setTimeout as sleep } from "node:timers/promises";
 
-const PORT = process.env.PORT ?? "3100";
-const BASE_URL = `http://localhost:${PORT}`;
+const DEFAULT_PORT = Number.parseInt(process.env.PORT ?? "3100", 10);
 
 /** Run a command and return the child process */
 function run(cmd, args, options = {}) {
-  const child = spawn(cmd, args, {
+  if (process.platform === "win32") {
+    const commandLine = [cmd, ...args]
+      .map((part) => (/\s/.test(part) ? `"${part.replace(/"/g, '\\"')}"` : part))
+      .join(" ");
+    return spawn(commandLine, {
+      stdio: "inherit",
+      shell: true,
+      ...options,
+    });
+  }
+
+  return spawn(cmd, args, {
     stdio: "inherit",
-    shell: process.platform === "win32",
+    shell: false,
     ...options,
   });
-  return child;
+}
+
+async function isPortFree(port) {
+  return new Promise((resolve) => {
+    const server = net.createServer();
+    server.once("error", () => resolve(false));
+    server.once("listening", () => {
+      server.close(() => resolve(true));
+    });
+    server.listen(port, "::");
+  });
+}
+
+async function findFreePort(startPort) {
+  for (let port = startPort; port < startPort + 50; port += 1) {
+    if (await isPortFree(port)) {
+      return port;
+    }
+  }
+  throw new Error(`Could not find free port in range ${startPort}-${startPort + 49}`);
 }
 
 async function waitForReady(url, timeoutMs = 30000) {
@@ -29,6 +59,13 @@ async function waitForReady(url, timeoutMs = 30000) {
 }
 
 async function smoke() {
+  const port = await findFreePort(DEFAULT_PORT);
+  const baseUrl = `http://localhost:${port}`;
+
+  if (port !== DEFAULT_PORT) {
+    console.log(`ℹ️ Port ${DEFAULT_PORT} is busy, using fallback port ${port}`);
+  }
+
   console.log("🔧 UI smoke: next build");
   await new Promise((resolve, reject) => {
     const build = run("npm", ["run", "build"], { env: process.env });
@@ -39,7 +76,7 @@ async function smoke() {
   });
 
   console.log("🚀 UI smoke: next start");
-  const server = run("npx", ["next", "start", "--port", PORT], {
+  const server = run("npx", ["next", "start", "--port", String(port)], {
     env: {
       ...process.env,
       // Minimal non-secret defaults so rate-limit middleware can initialize
@@ -50,12 +87,12 @@ async function smoke() {
   });
 
   try {
-    await waitForReady(`${BASE_URL}/`);
+    await waitForReady(`${baseUrl}/`);
 
     const routes = ["/", "/blog/natural-light-full-final", "/blog/plita-na-penoplaste"];
 
     for (const route of routes) {
-      const url = `${BASE_URL}${route}`;
+      const url = `${baseUrl}${route}`;
       console.log(`🌐 Fetch ${url}`);
       const res = await fetch(url);
       if (!res.ok) {

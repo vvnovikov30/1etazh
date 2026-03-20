@@ -21,10 +21,12 @@ function createJsonRequest(body: string, contentType = "application/json"): Requ
 describe("leads API integration (route.ts)", () => {
   beforeEach(() => {
     process.env = { ...ORIGINAL_ENV, NODE_ENV: "test" };
+    vi.stubEnv("NODE_ENV", "test");
     mockedSendTelegramMessage.mockReset();
   });
 
   afterEach(() => {
+    vi.unstubAllEnvs();
     process.env = { ...ORIGINAL_ENV };
     vi.restoreAllMocks();
   });
@@ -112,7 +114,7 @@ describe("leads API integration (route.ts)", () => {
 
   it("returns 500 when Telegram send returns false", async () => {
     mockedSendTelegramMessage.mockResolvedValue(false);
-    process.env.NODE_ENV = "development";
+    vi.stubEnv("NODE_ENV", "development");
     process.env.TELEGRAM_LEADS_BOT_TOKEN = "super-secret-token";
     const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 
