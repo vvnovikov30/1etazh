@@ -19,29 +19,31 @@ export async function generateStaticParams() {
   return services.map((s) => ({ slug: s.slug }));
 }
 
-export async function generateMetadata({ params }: { params: Params }): Promise<Metadata> {
-  const s = services.find((x) => x.slug === params.slug);
+export async function generateMetadata({ params }: { params: Promise<Params> }): Promise<Metadata> {
+  const { slug } = await params;
+  const s = services.find((x) => x.slug === slug);
   if (!s) return {};
 
   return {
     title: `${s.title} — Одноэтажники.РФ`,
     description: s.description,
-    alternates: { canonical: `/services/${s.slug}` },
+    alternates: { canonical: `/services/${slug}` },
     openGraph: {
       title: s.title,
       description: s.description,
-      url: `/services/${s.slug}`,
+      url: `/services/${slug}`,
       type: "website",
     },
   };
 }
 
-export default async function ServicePage({ params }: { params: Params }) {
-  const s = services.find((x) => x.slug === params.slug);
+export default async function ServicePage({ params }: { params: Promise<Params> }) {
+  const { slug } = await params;
+  const s = services.find((x) => x.slug === slug);
   if (!s) return notFound();
 
-  const mdxExists = hasServiceMdx(params.slug);
-  const mdx = mdxExists ? await getServiceBySlug(params.slug) : null;
+  const mdxExists = hasServiceMdx(slug);
+  const mdx = mdxExists ? await getServiceBySlug(slug) : null;
 
   return (
     <main>
