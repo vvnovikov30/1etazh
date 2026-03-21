@@ -24,21 +24,11 @@ const TELEGRAM_ENV_KEYS: Record<TelegramGroup, { token: string; chatId: string; 
 
 function getTelegramConfig(group: TelegramGroup): TelegramConfig | null {
   const envKeys = TELEGRAM_ENV_KEYS[group];
-  
-  // P0: Используем безопасный доступ к ENV
-  // В production выбрасывает ошибку если отсутствует
-  // В development возвращает null (graceful degradation)
-  let token: string;
-  let chatId: string;
-  
-  try {
-    token = getEnv(envKeys.token);
-    chatId = getEnv(envKeys.chatId);
-  } catch {
-    // В production getEnv выбрасывает ошибку - это правильно
-    // В development возвращает пустую строку
-    return null;
-  }
+
+  // getEnv fail-fast в production при отсутствии обязательных переменных.
+  // В development getEnv возвращает пустую строку, ниже сработает graceful return null.
+  const token = getEnv(envKeys.token);
+  const chatId = getEnv(envKeys.chatId);
 
   if (!token || !chatId) return null;
 
