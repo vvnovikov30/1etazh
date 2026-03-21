@@ -23,6 +23,9 @@ cp .env.example .env.local
 - `TELEGRAM_DISCUSSION_BOT_TOKEN`
 - `TELEGRAM_DISCUSSION_CHAT_ID`
 - `TELEGRAM_DISCUSSION_MESSAGE_THREAD_ID` (опционально)
+- `UPSTASH_REDIS_REST_URL` — URL для Upstash Redis REST API (для rate limiting)
+- `UPSTASH_REDIS_REST_TOKEN` — токен для Upstash Redis (для rate limiting)
+- `RATE_LIMIT_PER_MINUTE` — лимит запросов в минуту на IP (по умолчанию: 8)
 
 ## Контакты (константы)
 `lib/links.ts` — Telegram (чат), Telegram-канал, телефон.
@@ -167,3 +170,87 @@ import { Figure } from "@/components/Figure";
   caption="Кастомная подпись"
 />
 ```
+
+## Rate Limiting (защита от спама/DoS)
+
+Проект использует централизованный rate limiting на базе Redis (Upstash) для защиты API endpoints `/api/telegram/*` от спама и DoS атак.
+
+### Настройка
+
+1. **Создайте аккаунт Upstash Redis:**
+   - Перейдите на https://upstash.com/
+   - Создайте новый Redis database
+   - Скопируйте `UPSTASH_REDIS_REST_URL` и `UPSTASH_REDIS_REST_TOKEN`
+
+2. **Добавьте переменные в `.env.local`:**
+   ```bash
+   UPSTASH_REDIS_REST_URL=https://your-redis.upstash.io
+   UPSTASH_REDIS_REST_TOKEN=your-token-here
+   RATE_LIMIT_PER_MINUTE=8  # опционально, по умолчанию 8
+   ```
+
+3. **Установите зависимости:**
+   ```bash
+   npm install
+   ```
+
+### Как это работает
+
+- Rate limiting применяется автоматически через Next.js Middleware к всем маршрутам `/api/telegram/*`
+- Лимит: **8 запросов в минуту на IP** (настраивается через `RATE_LIMIT_PER_MINUTE`)
+- При превышении лимита возвращается HTTP 429 с JSON ответом:
+  ```json
+  {
+    "ok": false,
+    "error": "Too many requests",
+    "retry_after": 60
+  }
+  ```
+- Используется алгоритм **Sliding Window** для более точного ограничения
+- Работает в serverless среде (Vercel) благодаря Upstash Redis REST API
+
+### Trusted Proxy Strategy
+
+Rate limiting использует **trusted IP strategy** для защиты от spoofing:
+
+1. **Primary IP (req.ip)**: Если доступен и является публичным IP → используется как основной identifier
+   - XFF заголовки **полностью игнорируются** если есть req.ip
+   - Это предотвращает обход лимита через подмену XFF
+
+2. **Fallback IP (XFF)**: Используется только если req.ip недоступен
+   - Проверяется что IP публичный (не private/reserved/CGNAT/test ranges)
+   - Private IP (192.168.x.x, 10.x.x.x, 127.x.x.x и т.д.) отфильтровываются
+
+3. **Unknown IP**: Если IP не определен → используется hash-based fallback
+   - Строгий лимит: **2 запроса в минуту**
+   - Hash создается на основе User-Agent, Accept-Language и pathname
+
+**Важно**: В production с reverse proxy (nginx, Cloudflare, Vercel) `req.ip` обычно доступен и имеет приоритет. В serverless Edge Runtime `req.ip` может быть недоступен, тогда используется XFF как fallback.
+
+**IPv6 Support**: 
+- Поддерживаются IPv4-mapped IPv6 адреса (`::ffff:1.2.3.4`)
+- Фильтруются private/reserved IPv6 диапазоны (fc00::/7, fe80::/10, 2001:db8::/32 и т.д.)
+- Вложенный IPv4 в IPv4-mapped адресах проверяется на private/reserved ranges
+
+### Тестирование rate limiting
+
+Запустите нагрузочный тест:
+
+```bash
+# Убедитесь, что dev сервер запущен (npm run dev)
+node scripts/loadtest-rate-limit.mjs
+```
+
+Скрипт делает 15 запросов подряд на `/api/telegram/leads` и выводит:
+- Коды ответов для каждого запроса
+- Количество успешных запросов и заблокированных (429)
+- Rate limit headers (X-RateLimit-Limit, X-RateLimit-Remaining)
+
+**Ожидаемый результат:** первые 8 запросов должны вернуть 200 OK, остальные — 429 Too Many Requests.
+
+### Важные замечания
+
+- В **development** режиме при ошибках Redis запросы пропускаются (fail-open) для удобства разработки
+- В **production** режиме при ошибках Redis запросы отклоняются (fail-closed) для безопасности
+- Rate limiting не влияет на другие API endpoints (только `/api/telegram/*`)
+- Лимиты независимы для каждого IP адреса

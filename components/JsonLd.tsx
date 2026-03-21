@@ -1,13 +1,7 @@
 export function JsonLd({ data }: { data: unknown }) {
+  let json: string | null = null;
   try {
-    const json = JSON.stringify(data);
-    return (
-      <script
-        type="application/ld+json"
-        // eslint-disable-next-line react/no-danger
-        dangerouslySetInnerHTML={{ __html: json }}
-      />
-    );
+    json = JSON.stringify(data);
   } catch (e) {
     if (process.env.NODE_ENV !== "production") {
       console.error("JsonLd stringify error:", e);
@@ -15,4 +9,6 @@ export function JsonLd({ data }: { data: unknown }) {
     }
     return null;
   }
+  if (!json) return null;
+  return <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: json }} />;
 }

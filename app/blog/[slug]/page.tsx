@@ -6,12 +6,14 @@ import { blogPostingJsonLd } from "@/lib/seo";
 import { Container } from "@/components/Container";
 import { Section } from "@/components/Section";
 import { Button } from "@/components/Button";
+import { LINKS } from "@/lib/links";
 
-export default async function BlogPostPage({ params }: { params: { slug: string } }) {
-  const meta = blogIndex.find((p) => p.slug === params.slug);
+export default async function BlogPostPage({ params }: { params: Promise<{ slug: string }> }) {
+  const { slug } = await params;
+  const meta = blogIndex.find((p) => p.slug === slug);
   if (!meta) return notFound();
 
-  const post = await getBlogPostBySlug(params.slug);
+  const post = await getBlogPostBySlug(slug);
 
   return (
     <main>
@@ -37,7 +39,7 @@ export default async function BlogPostPage({ params }: { params: { slug: string 
               <div className="mt-4 flex flex-wrap gap-3">
                 <Button
                   as="a"
-                  href={process.env.TELEGRAM_CHANNEL_URL || "https://t.me/CodeofEnvironment"}
+                  href={LINKS.telegramChannel}
                   target="_blank"
                   rel="noreferrer"
                   variant="secondary"
@@ -46,7 +48,7 @@ export default async function BlogPostPage({ params }: { params: { slug: string 
                 </Button>
                 <Button
                   as="a"
-                  href={process.env.TELEGRAM_DISCUSSION_URL || "https://t.me/odnoetazhniki"}
+                  href={LINKS.telegramChat}
                   target="_blank"
                   rel="noreferrer"
                   variant="secondary"

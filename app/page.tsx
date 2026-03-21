@@ -59,8 +59,10 @@ export default function HomePage() {
     },
   ];
 
-  const telegramDiscussionUrl = process.env.TELEGRAM_DISCUSSION_URL || LINKS.telegramChat;
-  const telegramChannelUrl = process.env.TELEGRAM_CHANNEL_URL || LINKS.telegramChannel;
+  // P0: Используем LINKS вместо прямого доступа к process.env
+  // LINKS уже обрабатывает NEXT_PUBLIC_ переменные безопасно
+  const telegramDiscussionUrl = LINKS.telegramChat;
+  const telegramChannelUrl = LINKS.telegramChannel;
 
   return (
     <>

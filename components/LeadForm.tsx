@@ -101,7 +101,7 @@ export function LeadForm() {
       <Button
         as="button"
         type="submit"
-        disabled={isSubmitting || (phoneDigits && !isValidRuPhoneDigits(phoneDigits))}
+        disabled={isSubmitting || (!!phoneDigits && !isValidRuPhoneDigits(phoneDigits))}
       >
         {isSubmitting ? "Отправляем..." : "Отправить"}
       </Button>

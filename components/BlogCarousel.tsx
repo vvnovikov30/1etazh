@@ -29,6 +29,7 @@ export function BlogCarousel({ posts }: { posts: BlogCarouselPost[] }) {
               {coverSrc && (
                 <div className="relative mb-4 h-40 w-full overflow-hidden rounded-[var(--radius-card)]">
                   {coverSrc.startsWith("http") ? (
+                    // eslint-disable-next-line @next/next/no-img-element -- Remote covers can come from arbitrary domains; using next/image would require a domain allowlist and could break existing content.
                     <img
                       src={coverSrc}
                       alt={post.title}

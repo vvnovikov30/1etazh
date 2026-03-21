@@ -10,8 +10,21 @@
     --color-text: #2B2B2B;
     --color-bg: #FFFFFF;
     --color-bg-light: #F5F5F5;
+    /* Semantic surfaces */
+    --color-surface: var(--color-bg-light);
     --color-border: #E6E6E6;
     --color-on-primary: #FFFFFF;
+
+    /* Semantic text & states */
+    --color-muted: #5C5C5C;
+    --color-link: var(--color-secondary);
+    --color-link-hover: #233F5B;
+    --color-success: #15803D;
+    --color-warn: #B45309;
+    --color-danger: #B91C1C;
+
+    /* Focus ring (box-shadow) */
+    --focus-ring: 0 0 0 3px color-mix(in srgb, var(--color-primary) 28%, transparent);
 
     --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.08);
     --shadow-card-hover: 0 8px 16px rgba(0, 0, 0, 0.12);
@@ -30,8 +43,21 @@
       --color-text: #F2F2F2;
       --color-bg: #121212;
       --color-bg-light: #1A1A1A;
+      /* Semantic surfaces */
+      --color-surface: var(--color-bg-light);
       --color-border: #2A2A2A;
       --color-on-primary: #F2F2F2;
+
+      /* Semantic text & states */
+      --color-muted: #B8B8B8;
+      --color-link: var(--color-secondary);
+      --color-link-hover: #7FA9D0;
+      --color-success: #22C55E;
+      --color-warn: #F59E0B;
+      --color-danger: #EF4444;
+
+      /* Focus ring (box-shadow) */
+      --focus-ring: 0 0 0 3px color-mix(in srgb, var(--color-primary) 38%, transparent);
 
       --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.18);
       --shadow-card-hover: 0 6px 12px rgba(0, 0, 0, 0.24);
@@ -55,15 +81,29 @@
   }
 
   h3 {
-    @apply text-[24px] leading-[1.3] font-semibold;
+    @apply text-[20px] leading-[1.3] md:text-[24px] font-semibold;
   }
 
   a {
-    @apply text-[var(--color-secondary)] transition-colors duration-200;
+    @apply text-[var(--color-link)] transition-colors duration-200;
   }
 
   a:hover {
-    @apply underline;
+    @apply underline text-[var(--color-link-hover)];
+  }
+
+  :where(
+      a,
+      button,
+      input,
+      textarea,
+      select,
+      summary,
+      [role="button"],
+      [tabindex]
+    ):focus-visible {
+    outline: none;
+    box-shadow: var(--focus-ring);
   }
 
   input,
@@ -96,6 +136,73 @@
 
   .rich-text a {
     @apply underline;
+  }
+
+  /* Base card for expert content / callouts */
+  .card {
+    background-color: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-card);
+    box-shadow: var(--shadow-card);
+  }
+
+  /* Callouts */
+  .callout {
+    @apply card p-4 md:p-5 flex gap-3 md:gap-4;
+  }
+
+  .callout__icon {
+    @apply mt-1 shrink-0;
+  }
+
+  .callout__body {
+    @apply space-y-1;
+  }
+
+  .callout--info {
+    background-color: rgba(44, 79, 115, 0.06); /* secondary, soft */
+    border-left: 3px solid var(--color-secondary);
+  }
+
+  .callout--warn {
+    background-color: rgba(180, 83, 9, 0.06); /* warn, soft */
+    border-left: 3px solid var(--color-warn);
+  }
+
+  .callout--danger {
+    background-color: rgba(185, 28, 28, 0.06); /* danger, soft */
+    border-left: 3px solid var(--color-danger);
+  }
+
+  /* Badge */
+  .badge {
+    @apply inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium;
+    background-color: var(--color-primary);
+    color: var(--color-on-primary);
+  }
+
+  .badge--subtle {
+    background-color: rgba(31, 111, 106, 0.08);
+    color: var(--color-primary);
+  }
+
+  /* Checklist */
+  .checklist {
+    @apply space-y-2;
+    list-style: none;
+    padding-left: 0;
+  }
+
+  .checklist__item {
+    @apply flex items-start gap-2;
+  }
+
+  .checklist__icon {
+    @apply mt-1 h-4 w-4 shrink-0 rounded-full bg-success text-onBrand flex items-center justify-center;
+  }
+
+  .checklist__text {
+    @apply text-[15px] md:text-[16px];
   }
 
   /* Стили для таблиц Markdown (GFM) */

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, type InputHTMLAttributes } from "react";
+import { useMemo, useState, type InputHTMLAttributes } from "react";
 import { normalizePhone, isValidRuPhoneDigits } from "@/lib/phone";
 
 type PhoneInputProps = Omit<InputHTMLAttributes<HTMLInputElement>, "value" | "onChange"> & {
@@ -17,23 +17,26 @@ export function PhoneInput({
   error,
   ...props
 }: PhoneInputProps) {
-  const [displayValue, setDisplayValue] = useState("+7(");
-  const [digits, setDigits] = useState("");
+  const isControlled = value !== undefined;
+  const normalizedFromValue = useMemo(() => normalizePhone(value), [value]);
 
-  // Синхронизация с внешним value
-  useEffect(() => {
-    if (value !== digits) {
-      const normalized = normalizePhone(value);
-      setDisplayValue(normalized.formatted);
-      setDigits(normalized.digits);
-    }
-  }, [value]); // eslint-disable-line react-hooks/exhaustive-deps
+  const [uncontrolledDisplayValue, setUncontrolledDisplayValue] = useState<string>(() => {
+    return normalizedFromValue.formatted || "+7(";
+  });
+  const normalizedFromUncontrolled = useMemo(
+    () => normalizePhone(uncontrolledDisplayValue),
+    [uncontrolledDisplayValue]
+  );
+
+  const displayValue = isControlled ? normalizedFromValue.formatted : uncontrolledDisplayValue;
+  const digits = isControlled ? normalizedFromValue.digits : normalizedFromUncontrolled.digits;
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const input = e.target.value;
     const normalized = normalizePhone(input);
-    setDisplayValue(normalized.formatted);
-    setDigits(normalized.digits);
+    if (!isControlled) {
+      setUncontrolledDisplayValue(normalized.formatted);
+    }
     onChange?.(normalized.digits, normalized.formatted);
   };
 
@@ -41,8 +44,9 @@ export function PhoneInput({
     e.preventDefault();
     const pasted = e.clipboardData.getData("text");
     const normalized = normalizePhone(pasted);
-    setDisplayValue(normalized.formatted);
-    setDigits(normalized.digits);
+    if (!isControlled) {
+      setUncontrolledDisplayValue(normalized.formatted);
+    }
     onChange?.(normalized.digits, normalized.formatted);
   };
 
