@@ -4,7 +4,7 @@ vi.mock("@/lib/rate-limit", () => ({
   rateLimit: vi.fn(),
 }));
 
-import { middleware } from "@/middleware";
+import { proxy } from "@/proxy";
 import { rateLimit } from "@/lib/rate-limit";
 
 const mockedRateLimit = vi.mocked(rateLimit);
@@ -15,7 +15,7 @@ type FakeRequest = {
   headers: Headers;
 };
 
-describe("middleware integration smoke", () => {
+describe("proxy integration smoke", () => {
   beforeEach(() => {
     process.env = { ...ORIGINAL_ENV, NODE_ENV: "development" };
     mockedRateLimit.mockReset();
@@ -49,7 +49,7 @@ describe("middleware integration smoke", () => {
       headers: new Headers(),
     } as FakeRequest;
 
-    const response = await middleware(request as never);
+    const response = await proxy(request as never);
 
     expect(response.status).toBe(429);
     expect(response.headers.get("X-Debug-Ratelimit-Id")).toBe("ip:1.2.3.4");
@@ -62,7 +62,7 @@ describe("middleware integration smoke", () => {
       headers: new Headers(),
     } as FakeRequest;
 
-    const response = await middleware(request as never);
+    const response = await proxy(request as never);
 
     expect(response.status).toBe(200);
     expect(mockedRateLimit).not.toHaveBeenCalled();

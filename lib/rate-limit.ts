@@ -377,10 +377,29 @@ function getClientIp(req: NextRequest): { primary: string | null; fallback: stri
 async function createUnknownIpIdentifier(req: NextRequest): Promise<string> {
   const userAgent = req.headers.get("user-agent") || "";
   const acceptLanguage = req.headers.get("accept-language") || "";
+  const accept = req.headers.get("accept") || "";
+  const contentType = req.headers.get("content-type") || "";
+  const secChUa = req.headers.get("sec-ch-ua") || "";
+  const secChUaPlatform = req.headers.get("sec-ch-ua-platform") || "";
+  const secChUaMobile = req.headers.get("sec-ch-ua-mobile") || "";
+  const secFetchSite = req.headers.get("sec-fetch-site") || "";
+  const method = req.method || "";
   const pathname = req.nextUrl.pathname.slice(0, 50); // Ограничиваем длину pathname
 
-  // Создаем строку для хеширования
-  const input = `${userAgent}|${acceptLanguage}|${pathname}`;
+  // Добавляем умеренную entropy для разделения клиентов за NAT/private proxy.
+  // Используем только request traits без секретов и без долговременных идентификаторов.
+  const input = [
+    userAgent.slice(0, 200),
+    acceptLanguage.slice(0, 120),
+    accept.slice(0, 120),
+    contentType.slice(0, 80),
+    secChUa.slice(0, 160),
+    secChUaPlatform.slice(0, 40),
+    secChUaMobile.slice(0, 10),
+    secFetchSite.slice(0, 20),
+    method.slice(0, 10),
+    pathname,
+  ].join("|");
 
   // Используем Web Crypto API (работает в Edge Runtime)
   const encoder = new TextEncoder();
